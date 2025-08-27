@@ -1,9 +1,11 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "serverless.js", "use": "@vercel/node" }
-  ],
+  "functions": {
+    "serverless.js": {
+      "runtime": "@vercel/node@18"
+    }
+  },
   "routes": [
-    { "src": "/.*", "dest": "/serverless.js" }
+    { "src": "/(.*)", "dest": "/serverless.js" }
   ]
 }

@@ -1,4 +1,4 @@
-/* Configuration page logic (extracted from inline script) */
+/* Enhanced configuration page logic with loader & manifest polling */
 
 (function () {
     const methodTabs = document.querySelectorAll('.method-tab');
@@ -36,7 +36,6 @@
     function updateRequired(m) {
         document.querySelectorAll('#direct-section input, #xtream-section input')
             .forEach(i => i.removeAttribute('required'));
-
         if (m === 'direct') {
             document.getElementById('m3uUrl').setAttribute('required', '');
         } else {
@@ -69,7 +68,7 @@
         });
     }
 
-    // Prefill logic for reconfigure
+    // Prefill on reconfigure
     (function prefill() {
         const parts = window.location.pathname.split('/').filter(Boolean);
         if (parts.length >= 2 && parts[1] === 'configure') {
@@ -105,6 +104,138 @@
         }
     })();
 
+    // Loader elements
+    const overlay = document.getElementById('loaderOverlay');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const loaderMessage = document.getElementById('loaderMessage');
+    const loaderBox = document.querySelector('.loader-box');
+    const statusDetails = document.getElementById('statusDetails');
+    const copyBtn = document.getElementById('copyManifestBtn');
+    const openBtn = document.getElementById('openStremioBtn');
+    const cancelLoaderBtn = document.getElementById('cancelLoaderBtn');
+
+    const POLL_INTERVAL_MS = 1500;
+    const MAX_WAIT_MS = 90000;          // Max wait before giving up (still allows manual actions)
+    const PROGRESS_ESTIMATE_MS = 45000; // Time at which we reach ~95% if not yet ready
+
+    let pollTimer = null;
+    let autoOpened = false;
+    let manifestUrlGlobal = '';
+    let stremioUrlGlobal = '';
+    let startTime = 0;
+
+    function showOverlay() {
+        overlay.classList.remove('hidden');
+        loaderBox.classList.remove('success', 'error');
+        setProgress(0, 'Starting…');
+        statusDetails.textContent = '';
+        openBtn.disabled = true;
+        copyBtn.disabled = true;
+    }
+
+    function hideOverlay() {
+        overlay.classList.add('hidden');
+    }
+
+    function setProgress(pct, text) {
+        progressBar.style.width = Math.min(100, pct) + '%';
+        if (text) progressText.textContent = text;
+    }
+
+    function formatDuration(ms) {
+        const s = Math.round(ms / 1000);
+        if (s < 60) return s + 's';
+        const m = Math.floor(s / 60);
+        const rs = s % 60;
+        return `${m}m ${rs}s`;
+    }
+
+    function copyManifest() {
+        if (!manifestUrlGlobal) return;
+        navigator.clipboard.writeText(manifestUrlGlobal)
+            .then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => copyBtn.textContent = 'Copy Manifest URL', 1800);
+            })
+            .catch(() => {
+                copyBtn.textContent = 'Copy Failed';
+                setTimeout(() => copyBtn.textContent = 'Copy Manifest URL', 1800);
+            });
+    }
+
+    copyBtn.addEventListener('click', copyManifest);
+    openBtn.addEventListener('click', () => {
+        if (!stremioUrlGlobal) return;
+        // Trigger Stremio open
+        window.location.href = stremioUrlGlobal;
+    });
+    cancelLoaderBtn.addEventListener('click', hideOverlay);
+
+    function startPolling() {
+        startTime = Date.now();
+        attemptPoll();
+    }
+
+    function attemptPoll() {
+        const elapsed = Date.now() - startTime;
+        // Synthetic progress (up to 95%) until ready
+        if (progressBar.style.width.replace('%','') < 95) {
+            const synthetic = Math.min(95, (elapsed / PROGRESS_ESTIMATE_MS) * 95);
+            if (!loaderBox.classList.contains('success') && !loaderBox.classList.contains('error')) {
+                setProgress(synthetic, progressMessage(elapsed));
+            }
+        }
+
+        fetch(manifestUrlGlobal + '?_=' + Date.now(), { cache: 'no-store' })
+            .then(r => r.ok ? r.json() : Promise.reject(r.status))
+            .then(json => {
+                if (json && json.id) {
+                    // Ready
+                    loaderBox.classList.add('success');
+                    setProgress(100, 'Ready');
+                    statusDetails.textContent = 'Manifest fetched successfully.\nYou can now install the addon in Stremio.';
+                    loaderMessage.textContent = 'Playlist parsed successfully.';
+                    copyBtn.disabled = false;
+                    openBtn.disabled = false;
+                    if (!autoOpened) {
+                        autoOpened = true;
+                        // Attempt to open Stremio automatically
+                        window.location.href = stremioUrlGlobal;
+                    }
+                    if (pollTimer) clearTimeout(pollTimer);
+                    return;
+                }
+                scheduleNext(elapsed);
+            })
+            .catch(() => {
+                scheduleNext(elapsed);
+            });
+    }
+
+    function scheduleNext(elapsed) {
+        if (elapsed > MAX_WAIT_MS) {
+            loaderBox.classList.add('error');
+            loaderMessage.textContent = 'Taking longer than expected.';
+            statusDetails.textContent = 'You can still try opening Stremio or copy the manifest URL.\nIf installation fails now, wait a bit and retry.';
+            copyBtn.disabled = false;
+            openBtn.disabled = false;
+            setProgress(100, 'Fallback Ready');
+            return;
+        }
+        pollTimer = setTimeout(attemptPoll, POLL_INTERVAL_MS);
+    }
+
+    function progressMessage(elapsed) {
+        if (elapsed < 4000) return 'Downloading playlist…';
+        if (elapsed < 10000) return 'Parsing channels…';
+        if (elapsed < 18000) return 'Detecting movies & grouping…';
+        if (elapsed < 26000) return 'Fetching EPG (if enabled)…';
+        if (elapsed < 35000) return 'Parsing EPG data…';
+        if (elapsed < 45000) return 'Finalizing manifest…';
+        return 'Almost done…';
+    }
+
     document.getElementById('configForm').addEventListener('submit', async e => {
         e.preventDefault();
         const activeMethod = document.querySelector('.method-tab.active').dataset.method;
@@ -138,15 +269,15 @@
             config.instanceId = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
         }
 
-        // Base64 encode (server may also offer /encrypt; this version keeps your original behavior)
+        // Base64 encode (server may also offer /encrypt route; this keeps current behavior)
         const token = btoa(JSON.stringify(config));
-        const manifestUrl = `${window.location.origin}/${token}/manifest.json`;
-        const stremioUrl = `stremio://${window.location.host}/${token}/manifest.json`;
+        manifestUrlGlobal = `${window.location.origin}/${token}/manifest.json`;
+        stremioUrlGlobal = `stremio://${window.location.host}/${token}/manifest.json`;
 
-        window.location.href = stremioUrl;
-        setTimeout(() => {
-            alert(`If Stremio did not open, copy this URL:\n\n${manifestUrl}`);
-        }, 1500);
+        showOverlay();
+        copyBtn.disabled = false; // Allow early copying (even if not yet built)
+        statusDetails.textContent = 'We are preparing your addon instance.\nPlease keep this tab open.';
+        startPolling();
     });
 
     // Initialize defaults

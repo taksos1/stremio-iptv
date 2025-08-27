@@ -79,6 +79,26 @@
         </div>
     </div>
 
+    <!-- Loader Overlay -->
+    <div id="loaderOverlay" class="loader-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="loaderTitle">
+        <div class="loader-box">
+            <div class="spinner"></div>
+            <h2 id="loaderTitle">Preparing Your Addon…</h2>
+            <p id="loaderMessage">Parsing playlist and EPG (first time can take up to a minute).</p>
+            <div class="progress-wrapper">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <p id="progressText" class="progress-text">Starting…</p>
+
+            <div class="action-row">
+                <button id="openStremioBtn" class="open-btn" disabled>Open in Stremio</button>
+                <button id="copyManifestBtn" class="copy-btn" disabled>Copy Manifest URL</button>
+            </div>
+            <p id="statusDetails" class="status-details"></p>
+            <button id="cancelLoaderBtn" class="cancel-btn">Close</button>
+        </div>
+    </div>
+
     <script src="/configure.js" defer></script>
 </body>
 </html>

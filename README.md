@@ -1,27 +1,3 @@
-## 🧩 Docker Compose
-
-You can use Docker Compose to run the addon (and optional Redis) easily:
-
-```bash
-docker-compose up -d
-```
-
-This will build and start the addon on port 7000. To enable Redis, uncomment the Redis section in `docker-compose.yml` and set `REDIS_URL=redis://redis:6379` in your `.env`.
-
----
-
-## ▲ Deploy on Vercel
-
-This project supports serverless deployment on [Vercel](https://vercel.com/):
-
-1. Push your code to a GitHub/GitLab repo.
-2. Sign up at [vercel.com](https://vercel.com/) and import your repo.
-3. Vercel will detect `vercel.json` and deploy using `serverless.js`.
-4. Set your environment variables in the Vercel dashboard (Settings → Environment Variables).
-
-Your addon will be available at `https://your-vercel-project.vercel.app`.
-
----
 # M3U / EPG IPTV Addon for Stremio
 
 A feature‑rich, configurable Stremio addon that ingests IPTV M3U playlists and optional EPG (XMLTV) guide data – with built‑in Xtream Codes API support, encrypted configuration tokens, caching (LRU + optional Redis), dynamic per‑user instances, and a polished web configuration UI.
@@ -363,7 +339,19 @@ DEBUG=* npm start
 pm2 start server.js --name stremio-iptv
 ```
 
-### Docker (example)
+## 🧩 Docker Compose
+
+You can use Docker Compose to run the addon (and optional Redis) easily:
+
+```bash
+docker-compose up -d
+```
+
+This will build and start the addon on port 7000. To enable Redis, uncomment the Redis section in `docker-compose.yml` and set `REDIS_URL=redis://redis:6379` in your `.env`.
+
+---
+
+### Docker Build (example)
 
 ```dockerfile
 FROM node:18-alpine
@@ -381,6 +369,21 @@ Build & run:
 docker build -t stremio-iptv .
 docker run -e CONFIG_SECRET=$(openssl rand -hex 32) -p 7000:7000 stremio-iptv
 ```
+
+---
+
+## ▲ Deploy on Vercel
+
+This project supports serverless deployment on [Vercel](https://vercel.com/):
+
+1. Push your code to a GitHub/GitLab repo.
+2. Sign up at [vercel.com](https://vercel.com/) and import your repo.
+3. Vercel will detect `vercel.json` and deploy using `serverless.js`.
+4. Set your environment variables in the Vercel dashboard (Settings → Environment Variables).
+
+Your addon will be available at `https://your-vercel-project.vercel.app`.
+
+---
 
 ### Serverless (Vercel / Now)
 

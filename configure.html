@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>M3U/EPG Addon Configuration</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <link rel="stylesheet" href="/configure.css">
+</head>
+<body>
+    <div class="config-container">
+        <div class="header">
+            <h1>🔗 M3U/EPG Addon</h1>
+            <p>Configure or reconfigure your IPTV addon</p>
+        </div>
+        <div class="form-container">
+            <div class="method-tabs">
+                <div class="method-tab active" data-method="direct">📡 Direct Links</div>
+                <div class="method-tab" data-method="xtream">🔑 Xtream API</div>
+            </div>
+
+            <div class="info-box">
+                <h3 id="method-title">Direct M3U & EPG Links</h3>
+                <p id="method-description">Use direct URLs to your M3U playlist and EPG XML files.</p>
+            </div>
+
+            <form id="configForm" autocomplete="off">
+                <!-- Direct method section -->
+                <div id="direct-section" class="config-section active">
+                    <div class="form-group">
+                        <label for="m3uUrl">M3U Playlist URL <span class="required">*</span></label>
+                        <input type="url" id="m3uUrl" name="m3uUrl" placeholder="https://example.com/playlist.m3u">
+                    </div>
+                    <div class="form-group">
+                        <label for="epgUrl">EPG XML URL (Optional)</label>
+                        <input type="url" id="epgUrl" name="epgUrl" placeholder="https://example.com/epg.xml">
+                    </div>
+                </div>
+
+                <!-- Xtream method section -->
+                <div id="xtream-section" class="config-section">
+                    <div class="form-group">
+                        <label for="xtreamUrl">Xtream API URL <span class="required">*</span></label>
+                        <input type="url" id="xtreamUrl" name="xtreamUrl" placeholder="http://example.com:8080">
+                    </div>
+                    <div class="form-group">
+                        <label for="xtreamUsername">Username <span class="required">*</span></label>
+                        <input type="text" id="xtreamUsername" name="xtreamUsername" placeholder="Username / Email">
+                    </div>
+                    <div class="form-group">
+                        <label for="xtreamPassword">Password <span class="required">*</span></label>
+                        <input type="password" id="xtreamPassword" name="xtreamPassword" placeholder="Password">
+                        <small><a href="#" id="togglePwd" class="pwd-toggle">Show</a></small>
+                    </div>
+                    <div class="form-group" style="display:none;">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="xtreamUseM3U" name="xtreamUseM3U">
+                            <label for="xtreamUseM3U">Fetch as M3U (m3u_plus)</label>
+                        </div>
+                        <small>Use /get.php?type=m3u_plus instead of JSON endpoints.</small>
+                    </div>
+                    <div class="form-group" id="xtreamOutputGroup" style="display:none;">
+                        <label for="xtreamOutput">M3U Output Format (optional)</label>
+                        <input type="text" id="xtreamOutput" name="xtreamOutput" placeholder="ts or hls">
+                    </div>
+                </div>
+
+                <!-- Common options -->
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="enableEpg" name="enableEpg" checked>
+                        <label for="enableEpg">Enable EPG (TV Guide)</label>
+                    </div>
+                    <small>Disable if large EPG files cause memory/time issues.</small>
+                </div>
+
+                <button type="submit" class="install-button">🚀 Install / Update Addon</button>
+                <small style="text-align:center;margin-top:1rem;">Made with ❤️ by Inside4ndroid</small>
+            </form>
+        </div>
+    </div>
+
+    <script src="/configure.js" defer></script>
+</body>
+</html>

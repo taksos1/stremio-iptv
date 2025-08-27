@@ -375,6 +375,8 @@ This project is for personal / educational IPTV aggregation. Ensure your use com
 
 | Version | Highlights |
 |---------|------------|
+| 1.4.0 | Added function to manage EPG Offset in addon config |
+| 1.3.0 | Added new loader ui and copy manifest button |
 | 1.2.0 | Cache toggle env, separated assets, encryption endpoint refinement |
 | 1.1.x | Encrypted configs, Redis + LRU caching, password masking |
 | 1.0.0 | Initial release, M3U + EPG + Xtream support, dynamic config |

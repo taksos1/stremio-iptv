@@ -1,11 +1,10 @@
+// Only the modified/added parts are highlighted below; full file included for clarity
 require('dotenv').config();
 
 const { addonBuilder } = require("stremio-addon-sdk");
 const fetch = require("node-fetch");
 const xml2js = require("xml2js");
 const crypto = require("crypto");
-
-// Optional Redis + fallback LRU
 const LRUCache = require("./lruCache");
 let redisClient = null;
 if (process.env.REDIS_URL) {
@@ -29,17 +28,10 @@ const ADDON_ID = "org.stremio.m3u-epg-addon";
 
 const MAX_CACHE_ENTRIES = parseInt(process.env.MAX_CACHE_ENTRIES || '100', 10);
 const CACHE_TTL_MS = parseInt(process.env.CACHE_TTL_MS || (6 * 3600 * 1000).toString(), 10);
-
-// Global cache enable/disable (true by default)
 const CACHE_ENABLED = (process.env.CACHE_ENABLED || 'true').toLowerCase() !== 'false';
-
-// In-memory fallback caches
 const dataCache = new LRUCache({ max: MAX_CACHE_ENTRIES, ttl: CACHE_TTL_MS });
-
-// Build promise cache (per-config) - only used if caching enabled
 const buildPromiseCache = new Map();
 
-// Hash of config (includes instanceId)
 function createCacheKey(config) {
     return crypto.createHash('md5').update(JSON.stringify(config)).digest('hex');
 }
@@ -49,7 +41,6 @@ const DEFAULT_LOGO_SOURCES = [
     "https://raw.githubusercontent.com/iptv-org/iptv/master/logos/{id}.png"
 ];
 
-// Redis helpers
 async function redisGetJSON(key) {
     if (!redisClient || !CACHE_ENABLED) return null;
     try {
@@ -79,11 +70,23 @@ class M3UEPGAddon {
         this.config = config;
         this.manifestRef = manifestRef;
         this.cacheKey = createCacheKey(config);
-        this.updateInterval = 3600000; // 1 hour
+        this.updateInterval = 3600000;
         this.channels = [];
         this.movies = [];
         this.epgData = {};
         this.lastUpdate = 0;
+
+        // Normalize epgOffsetHours (optional)
+        if (typeof this.config.epgOffsetHours === 'string') {
+            const n = parseFloat(this.config.epgOffsetHours);
+            if (!isNaN(n)) this.config.epgOffsetHours = n;
+        }
+        if (typeof this.config.epgOffsetHours !== 'number' || !isFinite(this.config.epgOffsetHours)) {
+            this.config.epgOffsetHours = 0;
+        }
+        if (Math.abs(this.config.epgOffsetHours) > 48) {
+            this.config.epgOffsetHours = 0; // sanity
+        }
     }
 
     async loadFromCache() {
@@ -200,20 +203,46 @@ class M3UEPGAddon {
         }
     }
 
+    // Enhanced to parse optional timezone and apply offset
     parseEPGTime(s) {
-        const m = s.match(/(\d{14})/);
+        if (!s) return new Date();
+        // XMLTV often: YYYYMMDDHHMMSS ZZZZ  (timezone optional)  or YYYYMMDDHHMMSS+ZZZZ (no space)
+        const m = s.match(/^(\d{14})(?:\s*([+\-]\d{4}))?/);
         if (m) {
-            const t = m[1];
-            return new Date(
-                parseInt(t.slice(0, 4)),
-                parseInt(t.slice(4, 6)) - 1,
-                parseInt(t.slice(6, 8)),
-                parseInt(t.slice(8, 10)),
-                parseInt(t.slice(10, 12)),
-                parseInt(t.slice(12, 14))
-            );
+            const base = m[1];
+            const tz = m[2] || null;
+            const year = parseInt(base.slice(0, 4), 10);
+            const month = parseInt(base.slice(4, 6), 10) - 1;
+            const day = parseInt(base.slice(6, 8), 10);
+            const hour = parseInt(base.slice(8, 10), 10);
+            const min = parseInt(base.slice(10, 12), 10);
+            const sec = parseInt(base.slice(12, 14), 10);
+
+            let date;
+            if (tz) {
+                // Construct ISO-like string and let Date parse
+                const iso = `${year.toString().padStart(4,'0')}-${(month+1).toString().padStart(2,'0')}-${day.toString().padStart(2,'0')}T${hour.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}${tz}`;
+                const parsed = new Date(iso);
+                if (!isNaN(parsed.getTime())) {
+                    date = parsed;
+                }
+            }
+            if (!date) {
+                // Fallback: treat as local time
+                date = new Date(year, month, day, hour, min, sec);
+            }
+
+            if (this.config.epgOffsetHours) {
+                date = new Date(date.getTime() + this.config.epgOffsetHours * 3600000);
+            }
+            return date;
         }
-        return new Date(s);
+        // Fallback original approach
+        const d = new Date(s);
+        if (this.config.epgOffsetHours && !isNaN(d.getTime())) {
+            return new Date(d.getTime() + this.config.epgOffsetHours * 3600000);
+        }
+        return d;
     }
 
     getCurrentProgram(channelId) {
@@ -451,7 +480,6 @@ class M3UEPGAddon {
 }
 
 module.exports = async function createAddon(config = {}) {
-    // Ensure instanceId
     if (!config.instanceId) {
         config.instanceId = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(8).toString('hex');
     }
@@ -460,7 +488,7 @@ module.exports = async function createAddon(config = {}) {
         id: ADDON_ID,
         version: "1.2.0",
         name: ADDON_NAME,
-        description: "IPTV addon with M3U, EPG & Xtream (JSON/M3U) + encrypted configs, LRU/Redis cache, cache toggle",
+        description: "IPTV addon with M3U, EPG & Xtream (JSON/M3U) + encrypted configs, LRU/Redis cache, cache toggle, EPG offset",
         resources: ["catalog", "stream", "meta"],
         types: ["tv", "movie"],
         catalogs: [
@@ -508,7 +536,6 @@ module.exports = async function createAddon(config = {}) {
 
         builder.defineCatalogHandler(async (args) => {
             try {
-                // Background refresh (non-blocking)
                 addonInstance.updateData().catch(() => { });
                 let items = [];
                 if (args.type === 'tv' && args.id === 'iptv_channels') {

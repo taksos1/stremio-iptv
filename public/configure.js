@@ -1,4 +1,4 @@
-/* Enhanced configuration page logic with loader & manifest polling */
+/* Enhanced configuration page logic with loader & manifest polling + EPG offset */
 
 (function () {
     const methodTabs = document.querySelectorAll('.method-tab');
@@ -68,7 +68,7 @@
         });
     }
 
-    // Prefill on reconfigure
+    // Prefill on reconfigure (added epgOffsetHours)
     (function prefill() {
         const parts = window.location.pathname.split('/').filter(Boolean);
         if (parts.length >= 2 && parts[1] === 'configure') {
@@ -95,6 +95,9 @@
                         if (cfg.epgUrl) document.getElementById('epgUrl').value = cfg.epgUrl;
                     }
                     document.getElementById('enableEpg').checked = !!cfg.enableEpg;
+                    if (typeof cfg.epgOffsetHours === 'number') {
+                        document.getElementById('epgOffsetHours').value = cfg.epgOffsetHours;
+                    }
                 } catch (e) {
                     console.warn('Config decode failed (likely encrypted token):', e.message);
                 }
@@ -104,7 +107,7 @@
         }
     })();
 
-    // Loader elements
+    // Loader elements (unchanged from previous enhancement)
     const overlay = document.getElementById('loaderOverlay');
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
@@ -116,8 +119,8 @@
     const cancelLoaderBtn = document.getElementById('cancelLoaderBtn');
 
     const POLL_INTERVAL_MS = 1500;
-    const MAX_WAIT_MS = 90000;          // Max wait before giving up (still allows manual actions)
-    const PROGRESS_ESTIMATE_MS = 45000; // Time at which we reach ~95% if not yet ready
+    const MAX_WAIT_MS = 90000;
+    const PROGRESS_ESTIMATE_MS = 45000;
 
     let pollTimer = null;
     let autoOpened = false;
@@ -143,14 +146,6 @@
         if (text) progressText.textContent = text;
     }
 
-    function formatDuration(ms) {
-        const s = Math.round(ms / 1000);
-        if (s < 60) return s + 's';
-        const m = Math.floor(s / 60);
-        const rs = s % 60;
-        return `${m}m ${rs}s`;
-    }
-
     function copyManifest() {
         if (!manifestUrlGlobal) return;
         navigator.clipboard.writeText(manifestUrlGlobal)
@@ -167,7 +162,6 @@
     copyBtn.addEventListener('click', copyManifest);
     openBtn.addEventListener('click', () => {
         if (!stremioUrlGlobal) return;
-        // Trigger Stremio open
         window.location.href = stremioUrlGlobal;
     });
     cancelLoaderBtn.addEventListener('click', hideOverlay);
@@ -179,19 +173,16 @@
 
     function attemptPoll() {
         const elapsed = Date.now() - startTime;
-        // Synthetic progress (up to 95%) until ready
-        if (progressBar.style.width.replace('%','') < 95) {
+        if (parseFloat(progressBar.style.width) < 95) {
             const synthetic = Math.min(95, (elapsed / PROGRESS_ESTIMATE_MS) * 95);
             if (!loaderBox.classList.contains('success') && !loaderBox.classList.contains('error')) {
                 setProgress(synthetic, progressMessage(elapsed));
             }
         }
-
         fetch(manifestUrlGlobal + '?_=' + Date.now(), { cache: 'no-store' })
             .then(r => r.ok ? r.json() : Promise.reject(r.status))
             .then(json => {
                 if (json && json.id) {
-                    // Ready
                     loaderBox.classList.add('success');
                     setProgress(100, 'Ready');
                     statusDetails.textContent = 'Manifest fetched successfully.\nYou can now install the addon in Stremio.';
@@ -200,7 +191,6 @@
                     openBtn.disabled = false;
                     if (!autoOpened) {
                         autoOpened = true;
-                        // Attempt to open Stremio automatically
                         window.location.href = stremioUrlGlobal;
                     }
                     if (pollTimer) clearTimeout(pollTimer);
@@ -208,9 +198,7 @@
                 }
                 scheduleNext(elapsed);
             })
-            .catch(() => {
-                scheduleNext(elapsed);
-            });
+            .catch(() => scheduleNext(elapsed));
     }
 
     function scheduleNext(elapsed) {
@@ -265,21 +253,29 @@
         config.enableEpg = formData.has('enableEpg');
         if (formData.has('xtreamUseM3U')) config.xtreamUseM3U = true;
 
+        const epgOffsetRaw = formData.get('epgOffsetHours');
+        if (epgOffsetRaw !== null && epgOffsetRaw.trim() !== '') {
+            const num = parseFloat(epgOffsetRaw);
+            if (!isNaN(num) && isFinite(num) && Math.abs(num) < 48) {
+                config.epgOffsetHours = num;
+            }
+        }
+
         if (!config.instanceId) {
             config.instanceId = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
         }
 
-        // Base64 encode (server may also offer /encrypt route; this keeps current behavior)
         const token = btoa(JSON.stringify(config));
-        manifestUrlGlobal = `${window.location.origin}/${token}/manifest.json`;
-        stremioUrlGlobal = `stremio://${window.location.host}/${token}/manifest.json`;
+        const origin = window.location.origin;
+        const host = window.location.host;
+        manifestUrlGlobal = `${origin}/${token}/manifest.json`;
+        stremioUrlGlobal = `stremio://${host}/${token}/manifest.json`;
 
         showOverlay();
-        copyBtn.disabled = false; // Allow early copying (even if not yet built)
+        copyBtn.disabled = false;
         statusDetails.textContent = 'We are preparing your addon instance.\nPlease keep this tab open.';
         startPolling();
     });
 
-    // Initialize defaults
     switchMethod('direct');
 })();

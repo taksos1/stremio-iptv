@@ -90,6 +90,13 @@ Visit: `http://localhost:7000`
 | `xtreamUseM3U` | Optional | Force M3U mode instead of JSON API |
 | `xtreamOutput` | Optional | Adds `&output=` for custom container hints |
 
+### EPG Configuration
+
+EPG Time Offset: Add or subtract hours from all guide times after parsing.
+Use this if your EPG appears consistently shifted.
+
+Example: If guide shows programs 4 hours ahead of your local time, set -4. Can be fractional (e.g. 2.5) and supports up to ±24 realistically (hard limit ±48).
+
 ---
 
 ## 🔐 Token Formats & Security

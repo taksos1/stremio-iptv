@@ -73,13 +73,21 @@
                     <small>Disable if large EPG files cause memory/time issues.</small>
                 </div>
 
+                <div class="form-group">
+                    <label for="epgOffsetHours">EPG Time Offset (hours)</label>
+                    <input type="number" step="0.25" id="epgOffsetHours" name="epgOffsetHours" placeholder="0 (e.g. -4 or 2.5)">
+                    <small>
+                        Adjustment added to guide times (can be negative). Example: if guide is 4h ahead of real time, enter -4.
+                    </small>
+                </div>
+
                 <button type="submit" class="install-button">🚀 Install / Update Addon</button>
                 <small style="text-align:center;margin-top:1rem;">Made with ❤️ by Inside4ndroid</small>
             </form>
         </div>
     </div>
 
-    <!-- Loader Overlay -->
+    <!-- Loader Overlay (unchanged except already in your previous version) -->
     <div id="loaderOverlay" class="loader-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="loaderTitle">
         <div class="loader-box">
             <div class="spinner"></div>

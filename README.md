@@ -1,3 +1,27 @@
+## 🧩 Docker Compose
+
+You can use Docker Compose to run the addon (and optional Redis) easily:
+
+```bash
+docker-compose up -d
+```
+
+This will build and start the addon on port 7000. To enable Redis, uncomment the Redis section in `docker-compose.yml` and set `REDIS_URL=redis://redis:6379` in your `.env`.
+
+---
+
+## ▲ Deploy on Vercel
+
+This project supports serverless deployment on [Vercel](https://vercel.com/):
+
+1. Push your code to a GitHub/GitLab repo.
+2. Sign up at [vercel.com](https://vercel.com/) and import your repo.
+3. Vercel will detect `vercel.json` and deploy using `serverless.js`.
+4. Set your environment variables in the Vercel dashboard (Settings → Environment Variables).
+
+Your addon will be available at `https://your-vercel-project.vercel.app`.
+
+---
 # M3U / EPG IPTV Addon for Stremio
 
 A feature‑rich, configurable Stremio addon that ingests IPTV M3U playlists and optional EPG (XMLTV) guide data – with built‑in Xtream Codes API support, encrypted configuration tokens, caching (LRU + optional Redis), dynamic per‑user instances, and a polished web configuration UI.
@@ -52,11 +76,43 @@ MAX_CACHE_ENTRIES=100                     # LRU capacity
 > node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 > ```
 
+
 ### 3. Start the Server
 
 ```bash
 npm start
 ```
+
+---
+
+## 🐳 Docker Support
+
+You can run this addon in a Docker container for easy deployment and isolation.
+
+### Build the Docker image
+
+```bash
+docker build -t stremio-m3u-epg-addon .
+```
+
+### Run the container
+
+```bash
+docker run -d \
+  --name stremio_addon \
+  -p 7000:7000 \
+  -v $(pwd)/.env:/app/.env:ro \
+  stremio-m3u-epg-addon
+```
+
+This will:
+- Expose the addon on port 7000
+- Use your local `.env` file for configuration
+- Run in detached mode
+
+You can now access the addon at `http://localhost:7000` (or your server's IP).
+
+---
 
 Visit: `http://localhost:7000`
 
@@ -375,6 +431,7 @@ This project is for personal / educational IPTV aggregation. Ensure your use com
 
 | Version | Highlights |
 |---------|------------|
+| 1.5.0 | Added support for users to host on vercel and run in docker |
 | 1.4.0 | Added function to manage EPG Offset in addon config |
 | 1.3.0 | Added new loader ui and copy manifest button |
 | 1.2.0 | Cache toggle env, separated assets, encryption endpoint refinement |
